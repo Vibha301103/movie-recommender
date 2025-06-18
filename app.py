@@ -2,17 +2,45 @@ import requests
 import streamlit as st
 import pandas as pd
 import pickle
+import os
 
 st.title('🎬 Movie Recommender System')
 
+# --- Download the Pickle Files if Missing using requests ---
+def download_file_from_google_drive(file_id, destination):
+    URL = "https://docs.google.com/uc?export=download"
+    session = requests.Session()
+    response = session.get(URL, params={'id': file_id}, stream=True)
+    token = get_confirm_token(response)
+    if token:
+        response = session.get(URL, params={'id': file_id, 'confirm': token}, stream=True)
+    with open(destination, "wb") as f:
+        for chunk in response.iter_content(32768):
+            if chunk:
+                f.write(chunk)
 
-# Load data
-movie_dict = pickle.load(open('movie_dict.pkl', 'rb'))
+def get_confirm_token(response):
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            return value
+    return None
 
-similarity = pickle.load(open('similarity.pkl', 'rb'))
+if not os.path.exists("similarity.pkl"):
+    similarity_file_id = "1ObBS9BblPCgD8v8HSA4mimjtcPqkEAnm"
+    download_file_from_google_drive(similarity_file_id, "similarity.pkl")
 
+if not os.path.exists("movie_dict.pkl"):
+    movie_dict_file_id = "1koLPKCppmYo9bSSdPsWutJnqbQol1yUh"
+    download_file_from_google_drive(movie_dict_file_id, "movie_dict.pkl")
 
-movie = pd.DataFrame(movie_dict)
+# --- Load Data Safely ---
+try:
+    movie_dict = pickle.load(open('movie_dict.pkl', 'rb'))
+    similarity = pickle.load(open('similarity.pkl', 'rb'))
+    movie = pd.DataFrame(movie_dict)
+except Exception as e:
+    st.error("❌ Failed to load recommendation data.")
+    st.stop()
 
 # ✅ Safe function to fetch posters from TMDB (handles errors)
 def fetch_poster(movie_id):
@@ -29,7 +57,6 @@ def fetch_poster(movie_id):
             return "https://via.placeholder.com/500x750?text=No+Image"
     except:
         return "https://via.placeholder.com/500x750?text=Poster+Unavailable"
-
 
 # ✅ Recommend similar movies
 def recommend(mov):
