@@ -5,9 +5,13 @@ import pickle
 
 st.title('🎬 Movie Recommender System')
 
+
 # Load data
 movie_dict = pickle.load(open('movie_dict.pkl', 'rb'))
+
 similarity = pickle.load(open('similarity.pkl', 'rb'))
+
+
 movie = pd.DataFrame(movie_dict)
 
 # ✅ Safe function to fetch posters from TMDB (handles errors)
