@@ -1,7 +1,8 @@
 streamlit~=1.45.1
 requests~=2.32.4
-pip~=24.3.1
+pip~=25.1
 attrs~=25.3.0
 protobuf~=6.31.1
 pillow~=11.2.1
 pandas~=2.3.0
+gdown~=5.2.0

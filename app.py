@@ -1,88 +1,62 @@
-import requests
 import streamlit as st
 import pandas as pd
 import pickle
 import os
+import gdown  # ✅ new import
 
 st.title('🎬 Movie Recommender System')
 
-# --- Download the Pickle Files if Missing using requests ---
-def download_file_from_google_drive(file_id, destination):
-    URL = "https://docs.google.com/uc?export=download"
-    session = requests.Session()
-    response = session.get(URL, params={'id': file_id}, stream=True)
-    token = get_confirm_token(response)
-    if token:
-        response = session.get(URL, params={'id': file_id, 'confirm': token}, stream=True)
-    with open(destination, "wb") as f:
-        for chunk in response.iter_content(32768):
-            if chunk:
-                f.write(chunk)
-
-def get_confirm_token(response):
-    for key, value in response.cookies.items():
-        if key.startswith('download_warning'):
-            return value
-    return None
+# ✅ Use gdown to download files from Google Drive
+if not os.path.exists("movie_dict.pkl"):
+    gdown.download(id="1koLPKCppmYo9bSSdPsWutJnqbQol1yUh", output="movie_dict.pkl", quiet=False)
 
 if not os.path.exists("similarity.pkl"):
-    similarity_file_id = "1ObBS9BblPCgD8v8HSA4mimjtcPqkEAnm"
-    download_file_from_google_drive(similarity_file_id, "similarity.pkl")
+    gdown.download(id="1ObBS9BblPCgD8v8HSA4mimjtcPqkEAnm", output="similarity.pkl", quiet=False)
 
-if not os.path.exists("movie_dict.pkl"):
-    movie_dict_file_id = "1koLPKCppmYo9bSSdPsWutJnqbQol1yUh"
-    download_file_from_google_drive(movie_dict_file_id, "movie_dict.pkl")
-
-# --- Load Data Safely ---
+# ✅ Load data safely
 try:
-    movie_dict = pickle.load(open('movie_dict.pkl', 'rb'))
-    similarity = pickle.load(open('similarity.pkl', 'rb'))
+    with open("movie_dict.pkl", "rb") as f:
+        movie_dict = pickle.load(f)
+    with open("similarity.pkl", "rb") as f:
+        similarity = pickle.load(f)
     movie = pd.DataFrame(movie_dict)
 except Exception as e:
-    st.error("❌ Failed to load recommendation data.")
+    st.error(f"❌ Failed to load files: {e}")
     st.stop()
 
-# ✅ Safe function to fetch posters from TMDB (handles errors)
+# ✅ Poster fetch
 def fetch_poster(movie_id):
     try:
         api_key = "8265bd1679663a7ea12ac168da84d2e8"
         url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={api_key}&language=en-US"
-        response = requests.get(url, timeout=3)  # ⏱️ Wait max 3 seconds
+        response = requests.get(url, timeout=3)
         response.raise_for_status()
         data = response.json()
         poster_path = data.get("poster_path")
-        if poster_path:
-            return "https://image.tmdb.org/t/p/w500/" + poster_path
-        else:
-            return "https://via.placeholder.com/500x750?text=No+Image"
+        return "https://image.tmdb.org/t/p/w500/" + poster_path if poster_path else "https://via.placeholder.com/500x750?text=No+Image"
     except:
         return "https://via.placeholder.com/500x750?text=Poster+Unavailable"
 
-# ✅ Recommend similar movies
+# ✅ Recommendation logic
 def recommend(mov):
     index = movie[movie['title'] == mov].index[0]
     distances = similarity[index]
     movie_list = sorted(list(enumerate(distances)), reverse=True, key=lambda x: x[1])[1:6]
-
     recommended_titles = []
     recommended_posters = []
-
     for i in movie_list:
         movie_id = movie.iloc[i[0]].movie_id
         title = movie.iloc[i[0]].title
         recommended_titles.append(title)
         recommended_posters.append(fetch_poster(movie_id))
-
     return recommended_titles, recommended_posters
 
-# UI: Dropdown for movie selection
+# ✅ UI
 movie_names = movie['title'].values
 selected_moviebox = st.selectbox("🎥 Type or select a movie from the list:", movie_names)
 
-# Button to show recommendations
 if st.button('🔍 Show Recommendations'):
     movie_recommendations, poster_recommendations = recommend(selected_moviebox)
-
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         st.text(movie_recommendations[0])
